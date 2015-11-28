@@ -19,7 +19,7 @@ EOF
 
 elif [[ $1 == install ]]; then
   source $HOME/.nix-profile/etc/profile.d/nix.sh
-  ./dev-shell --run "./bootstrap.sh; configurePhase; make install"
+  ./dev-shell --run "./bootstrap.sh && configurePhase && make install"
 elif [[ $1 == check ]]; then
   source $HOME/.nix-profile/etc/profile.d/nix.sh
   ./dev-shell --run "make installcheck"
