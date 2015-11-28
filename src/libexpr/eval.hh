@@ -61,6 +61,31 @@ typedef list<std::pair<string, Path> > SearchPath;
 /* Initialise the Boehm GC, if applicable. */
 void initGC();
 
+class InformationStore {
+private:
+    std::map< Value *, std::list<Pos>> values;
+    std::vector< Value * > possibleValues;
+    std::list< std::pair< Pos, std::list< Value * >>> env;
+    std::list< std::pair< Value * , std::list< Value * >>> functionCalls;
+public:
+    inline void addValue (Value *v, const Pos &pos) {
+        values[v].push_back(pos);
+    }
+    void writeDatabase(std::ostream &stream);
+    inline Value * initValue(Value * v) {
+        possibleValues.push_back(v);
+        return v;
+    }
+    void addEnvironment(Pos pos, std::list< Value* > allEnv) {
+        env.push_back(std::make_pair(pos, allEnv));
+    }
+    void addFunctionCall(Value * lambda, const Env &env2) {
+      std::list< Value * > allVars;
+      for (unsigned int i = 0; i < env2.size; ++i)
+          allVars.push_back(env2.values[i]);
+      functionCalls.push_back(std::make_pair(lambda, allVars));
+    }
+};
 
 class EvalState
 {
@@ -82,6 +107,7 @@ public:
 
     Value vEmptySet;
 
+    InformationStore informationStore;
 private:
     SrcToStore srcToStore;
 

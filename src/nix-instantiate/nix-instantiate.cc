@@ -12,6 +12,7 @@
 #include "misc.hh"
 
 #include <map>
+#include <fstream>
 #include <iostream>
 
 
@@ -42,7 +43,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         return;
     }
 
-    Value vRoot;
+    Value & vRoot = *state.allocValue();
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
@@ -191,6 +192,8 @@ int main(int argc, char * * argv)
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
+        std::ofstream output("output_stat");
+        state.informationStore.writeDatabase(output);
         state.printStats();
     });
 }

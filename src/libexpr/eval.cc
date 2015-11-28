@@ -55,7 +55,7 @@ static void * allocBytes(size_t n)
 }
 
 
-static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
+static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v, bool recursive)
 {
     checkInterrupt();
 
@@ -96,7 +96,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
             sorted[i.name] = i.value;
         for (auto & i : sorted) {
             str << i.first << " = ";
-            printValue(str, active, *i.second);
+            if (recursive)
+                printValue(str, active, *i.second, recursive);
+            else
+                str << i.second;
             str << "; ";
         }
         str << "}";
@@ -107,7 +110,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     case tListN:
         str << "[ ";
         for (unsigned int n = 0; n < v.listSize(); ++n) {
-            printValue(str, active, *v.listElems()[n]);
+            if (recursive)
+                printValue(str, active, *v.listElems()[n], recursive);
+            else
+                str << v.listElems()[n];
             str << " ";
         }
         str << "]";
@@ -117,7 +123,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "<CODE>";
         break;
     case tLambda:
-        str << "<LAMBDA>";
+        str << "<LAMBDA: " << v.lambda.fun;
         break;
     case tPrimOp:
         str << "<PRIMOP>";
@@ -139,10 +145,49 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
     std::set<const Value *> active;
-    printValue(str, active, v);
+    printValue(str, active, v, true);
     return str;
 }
 
+void InformationStore::writeDatabase(std::ostream& stream)
+{
+    for (auto value: values) {
+        for (const Pos & pos: value.second) {
+            if (pos) {
+                stream << pos.file << ":" << pos.line << ":" << pos.column << " " << value.first << "\n";
+            }
+        }
+    }
+    stream << "__DATA__" << std::endl;
+    for (auto value: possibleValues) {
+      stream << value << " ";
+      std::set<const Value *> active;
+      printValue(stream, active, *value, false);
+      stream << "\n";
+    }
+    stream << "__ENVIRONMENT__" << std::endl;
+    for (auto e: env) {
+        if (e.first) {
+            stream << e.first.file << ":" << e.first.line << ":" << e.first.column << " ";
+        }
+        for (auto l: e.second) {
+            stream << l << " ";
+        }
+        stream << "\n";
+    }
+    stream << "__FUNCTIONCALLS__" << std::endl;
+    for (auto e: functionCalls) {
+        if (e.first) {
+            if (e.first->lambda.fun->pos) {
+                stream << e.first->lambda.fun << " " << e.first->lambda.fun->pos.file << ":" << e.first->lambda.fun->pos.line << ":" << e.first->lambda.fun->pos.column << " ";
+            }        
+        }
+        for (auto l: e.second) {
+            stream << l << " ";
+        }
+        stream << "\n";
+    }
+}
 
 string showType(const Value & v)
 {
@@ -444,28 +489,39 @@ void mkPath(Value & v, const char * s)
     mkPathNoCopy(v, dupString(s));
 }
 
-
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
     for (unsigned int l = var.level; l; --l, env = env->up) ;
 
     if (!var.fromWith) return env->values[var.displ];
 
+    std::list< Value * > allEnv;
+    Value * result = 0;
+    
     while (1) {
-        if (!env->haveWithAttrs) {
+        if (!env->haveWithAttrs && !result) {
             if (noEval) return 0;
             Value * v = allocValue();
             evalAttrs(*env->up, (Expr *) env->values[0], *v);
             env->values[0] = v;
             env->haveWithAttrs = true;
         }
-        Bindings::iterator j = env->values[0]->attrs->find(var.name);
-        if (j != env->values[0]->attrs->end()) {
-            if (countCalls && j->pos) attrSelects[*j->pos]++;
-            return j->value;
+        if (env->haveWithAttrs) {
+            allEnv.push_back(env->values[0]);
+            Bindings::iterator j = env->values[0]->attrs->find(var.name);
+            if (j != env->values[0]->attrs->end()) {
+                if (countCalls && j->pos) attrSelects[*j->pos]++;
+                result = j->value;
+            }
         }
-        if (!env->prevWith)
-            throwUndefinedVarError("undefined variable ‘%1%’ at %2%", var.name, var.pos);
+        if (!env->prevWith) {
+            if (result) {
+                informationStore.addEnvironment(var.pos, allEnv); 
+                return result;
+            }
+            else
+                throwUndefinedVarError("undefined variable ‘%1%’ at %2%", var.name, var.pos);
+        }
         for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -474,7 +530,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 Value * EvalState::allocValue()
 {
     nrValues++;
-    return (Value *) allocBytes(sizeof(Value));
+    return informationStore.initValue( (Value *) allocBytes(sizeof(Value)));
 }
 
 
@@ -892,7 +948,7 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
     /* FIXME: vFun prevents GCC from doing tail call optimisation. */
-    Value vFun;
+    Value &vFun = *state.allocValue();
     e1->eval(state, env, vFun);
     state.callFunction(vFun, *(e2->maybeThunk(state, env)), v, pos);
 }
@@ -1005,6 +1061,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     nrFunctionCalls++;
     if (countCalls) incrFunctionCall(&lambda);
+    informationStore.addFunctionCall(&fun, env2);
 
     /* Evaluate the body.  This is conditional on showTrace, because
        catching exceptions makes this function not tail-recursive. */

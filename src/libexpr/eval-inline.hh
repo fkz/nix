@@ -26,6 +26,7 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const
 
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
+    informationStore.addValue(&v, pos);
     if (v.type == tThunk) {
         Env * env = v.thunk.env;
         Expr * expr = v.thunk.expr;
