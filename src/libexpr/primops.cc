@@ -441,6 +441,26 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
     mkInt(v, valueSize(*args[0]));
 }
 
+/* Evaluate the firstt argument.
+ * If it is an error, return { type = error; value = string }
+ * Remember, nix is lazy, so only what is really evaluated here is catched
+ *
+ * TODO return a little bit more structure, e. g. the type of the exception etc.
+ */
+void prim_catch(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    try {
+        state.forceValue(*args[0]);
+        v = *args[0];
+    }
+    catch (Error & e) {
+        state.mkAttrs(v, 2);
+        mkString(*state.allocAttr(v, state.symbols.create("type")), "error");
+        mkString(*state.allocAttr(v, state.symbols.create("message")), e.msg());
+        v.attrs->sort();
+    }
+}
+
 
 /*************************************************************
  * Derivations
@@ -1794,6 +1814,7 @@ void EvalState::createBaseEnv()
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
     addPrimOp("__valueSize", 1, prim_valueSize);
+    addPrimOp("__catch", 1, prim_catch);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
