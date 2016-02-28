@@ -441,6 +441,38 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
     mkInt(v, valueSize(*args[0]));
 }
 
+/* Evaluate the second argument.
+* If it is an error of a type in the first argument, return { type = error; subtype = type; prefix = string; value = string }
+ * Remember, nix is lazy, so only what is really evaluated here is catched
+ */
+void prim_catch(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceStringNoCtx(*args[0]);
+    const char * errorTypeWhichIsCatched = args[0]->string.s;
+    try
+    {
+        state.forceValue(*args[1]);
+        v = *args[1];
+    }
+    catch (Error & e)
+    {
+        if (e.isOfType(errorTypeWhichIsCatched))
+        {
+            state.mkAttrs(v, 4);
+            mkString(*state.allocAttr(v, state.symbols.create("type")), "error");
+            mkString(*state.allocAttr(v, state.symbols.create("error-type")), e.subtype());
+            mkString(*state.allocAttr(v, state.symbols.create("prefix")), e.prefix());
+            mkString(*state.allocAttr(v, state.symbols.create("message")), e.msg());
+            v.attrs->sort();
+            return;
+        }
+        else
+        {
+          throw;
+        }
+    }
+}
+
 
 /*************************************************************
  * Derivations
@@ -1805,6 +1837,7 @@ void EvalState::createBaseEnv()
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
     addPrimOp("__valueSize", 1, prim_valueSize);
+    addPrimOp("__catch", 2, prim_catch);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);

@@ -60,6 +60,8 @@ public:
     const string & msg() const { return err; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
+    virtual bool isOfType(string type) { return type == "BaseError"; }
+    virtual string subtype() { return "BaseError"; }
 };
 
 #define MakeError(newClass, superClass) \
@@ -67,6 +69,8 @@ public:
     {                                                   \
     public:                                             \
         newClass(const FormatOrString & fs, unsigned int status = 1) : superClass(fs, status) { }; \
+        virtual bool isOfType(string type) { return superClass::isOfType(type) || type == #newClass; } \
+        virtual string subtype() { return #newClass; } \
     };
 
 MakeError(Error, BaseError)
