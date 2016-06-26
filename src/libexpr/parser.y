@@ -250,6 +250,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   const char * id; // !!! -> Symbol
   char * path;
   char * uri;
+  char *doc_comment;
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
@@ -509,8 +510,12 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal(data->symbols.create($1), 0); }
-  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
+  : ID { $$ = new Formal(data->symbols.create($1), 0, 0); }
+  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3, 0); }
+  | DOC_COMMENT ID { $$ = new Formal(data->symbols.create($2), 0, $1); }
+  | ID DOC_COMMENT { $$ = new Formal(data->symbols.create($1), 0, $2); }
+  | DOC_COMMENT ID '?' expr { $$ = new Formal(data->symbols.create($2), $4, $1); }
+  | ID '?' expr DOC_COMMENT { $$ = new Formal(data->symbols.create($1), $3, $4); }
   ;
 
 %%
