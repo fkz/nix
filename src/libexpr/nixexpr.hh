@@ -212,7 +212,10 @@ struct Formal
 {
     Symbol name;
     Expr * def;
-    Formal(const Symbol & name, Expr * def) : name(name), def(def) { };
+    char *docComment;
+    Formal(const Symbol & name, Expr * def, char * docComment) : name(name), def(def), docComment(docComment) { };
+
+    ~Formal();
 };
 
 struct Formals

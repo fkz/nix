@@ -1228,6 +1228,29 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     v.attrs->sort();
 }
 
+static void prim_functionArgDocs(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    if (args[0]->type != tLambda)
+        throw TypeError(format("‘functionArgDocs’ requires a function, at %1%") % pos);
+
+    if (!args[0]->lambda.fun->matchAttrs) {
+        state.mkAttrs(v, 0);
+        return;
+    }
+
+    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
+
+    for (auto & i : args[0]->lambda.fun->formals->formals) {
+        if (i.docComment != NULL)
+          mkString(*state.allocAttr(v, i.name), i.docComment);
+        else
+          mkNull(*state.allocAttr(v,i.name));
+    }
+
+    v.attrs->sort();
+}
+
 
 /*************************************************************
  * Lists
@@ -1868,6 +1891,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
     addPrimOp("__catAttrs", 2, prim_catAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
+    addPrimOp("__functionArgDocs", 1, prim_functionArgDocs);
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);

@@ -91,8 +91,7 @@ PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+
 HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
 URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+
-
-
+DOC_COMMENT  \/\*!([^*]|\*[^\/])*\*\/
 %%
 
 <INITIAL,INSIDE_DOLLAR_CURLY>{
@@ -182,10 +181,12 @@ or          { return OR_KW; }
 
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
-{PATH}      { yylval->path = strdup(yytext); return PATH; }
-{HPATH}     { yylval->path = strdup(yytext); return HPATH; }
-{SPATH}     { yylval->path = strdup(yytext); return SPATH; }
-{URI}       { yylval->uri = strdup(yytext); return URI; }
+{PATH}        { yylval->path = strdup(yytext); return PATH; }
+{HPATH}       { yylval->path = strdup(yytext); return HPATH; }
+{SPATH}       { yylval->path = strdup(yytext); return SPATH; }
+{URI}         { yylval->uri = strdup(yytext); return URI; }
+{DOC_COMMENT} { yylval->doc_comment = strndup(&yytext[3], strlen(yytext) - 5); return DOC_COMMENT; }
+
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
