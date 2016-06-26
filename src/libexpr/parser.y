@@ -270,6 +270,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH
 %token <uri> URI
+%token <doc_comment> DOC_COMMENT
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
